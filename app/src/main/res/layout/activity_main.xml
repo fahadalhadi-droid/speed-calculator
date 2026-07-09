@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/off_white"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <ImageView
+            android:id="@+id/imageLogo"
+            android:layout_width="match_parent"
+            android:layout_height="90dp"
+            android:layout_marginBottom="12dp"
+            android:adjustViewBounds="true"
+            android:scaleType="fitCenter"
+            android:contentDescription="4 Stroker Zone logo"
+            android:src="@drawable/logo_4_stroker_zone"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Jeep Speed Calculator"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@color/jeep_green_dark"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Enter your gearing and tire setup to get true road speed at any RPM."
+            android:textSize="13sp"
+            android:textColor="@color/text_dark"
+            android:layout_marginBottom="20dp"/>
+
+        <!-- Tire Diameter -->
+        <TextView style="@style/FieldLabel" android:text="Tire Diameter (inches, overall)"/>
+        <EditText
+            android:id="@+id/editTireDiameter"
+            style="@style/FieldInput"
+            android:hint="e.g. 35"
+            android:inputType="numberDecimal"/>
+
+        <!-- Axle Ratio -->
+        <TextView style="@style/FieldLabel" android:text="Axle (Differential) Ratio"/>
+        <EditText
+            android:id="@+id/editAxleRatio"
+            style="@style/FieldInput"
+            android:hint="e.g. 4.10"
+            android:inputType="numberDecimal"/>
+
+        <!-- Transfer Case Ratio -->
+        <TextView style="@style/FieldLabel" android:text="Transfer Case Ratio"/>
+        <EditText
+            android:id="@+id/editTransferCase"
+            style="@style/FieldInput"
+            android:hint="e.g. 2.72 (low) or 1.00 (high)"
+            android:inputType="numberDecimal"/>
+
+        <!-- Transmission Gear Ratio -->
+        <TextView style="@style/FieldLabel" android:text="Transmission Gear Ratio"/>
+        <EditText
+            android:id="@+id/editGearRatio"
+            style="@style/FieldInput"
+            android:hint="e.g. 1.00 for direct/top gear"
+            android:inputType="numberDecimal"/>
+
+        <!-- RPM -->
+        <TextView style="@style/FieldLabel" android:text="Engine RPM"/>
+        <EditText
+            android:id="@+id/editRpm"
+            style="@style/FieldInput"
+            android:hint="e.g. 3000"
+            android:inputType="number"/>
+
+        <Button
+            android:id="@+id/buttonCalculate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="@color/accent_orange"
+            android:textColor="@color/white"
+            android:text="Calculate Speed"/>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/jeep_green">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:id="@+id/textSpeedResult"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Speed: -- mph  /  -- km/h"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:textSize="20sp"/>
+
+                <TextView
+                    android:id="@+id/textTotalRatio"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Total gear reduction: --:1"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Speed Table (current gearing)"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:textColor="@color/jeep_green_dark"/>
+
+        <TextView
+            android:id="@+id/textSpeedTable"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:fontFamily="monospace"
+            android:textSize="14sp"
+            android:textColor="@color/text_dark"
+            android:text=""/>
+
+    </LinearLayout>
+</ScrollView>
