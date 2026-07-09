@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="jeep_green">#2E4A26</color>
+    <color name="jeep_green_dark">#1B2E15</color>
+    <color name="accent_orange">#D9642C</color>
+    <color name="white">#FFFFFF</color>
+    <color name="off_white">#F4F2EC</color>
+    <color name="text_dark">#1C1C1C</color>
+</resources>
