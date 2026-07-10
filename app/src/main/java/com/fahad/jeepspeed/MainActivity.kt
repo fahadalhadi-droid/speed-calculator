@@ -34,6 +34,17 @@ import java.util.Locale
  * until d reaches 90m (or the vehicle can't out-accelerate resistance, in
  * which case there's no result).
  *
+ * Gearing is wired into this, not just weight/HP: tire diameter, axle ratio,
+ * transfer case ratio, and transmission gear ratio combine into Total Ratio,
+ * and together with the entered Engine RPM (treated as your redline/shift
+ * point) they set a hard top-speed ceiling via the same MPH formula used for
+ * the main speed calculator:
+ *   V_gear = (RPM x Tire Diameter) / (Total Ratio x 336)
+ * The simulation accelerates under power/traction as above, but once v
+ * reaches V_gear it is pinned there (you've run out of RPM in that gear) --
+ * so changing any gearing input changes V_gear, which changes whether the
+ * run finishes power-limited or gearing-limited, and therefore the ET.
+ *
  * Rolling resistance coefficients (Crr) for compacted sand are documented in
  * terramechanics literature at roughly 0.10-0.155 (e.g. Coutermarsh,
  * "Velocity effect of vehicle rolling resistance in sand", J. Terramechanics).
@@ -159,16 +170,19 @@ class MainActivity : AppCompatActivity() {
             textSpeedResult.text = "Speed: -- mph  /  -- km/h"
             textTotalRatio.text = "Total gear reduction: --:1"
             textSpeedTable.text = "Fill in tire diameter, axle ratio, transfer case ratio, and gear ratio."
+            cardSandDrag.visibility = View.GONE
             return
         }
 
         val totalRatio = axleRatio * transferCase * gearRatio
         textTotalRatio.text = String.format(Locale.US, "Total gear reduction: %.3f:1", totalRatio)
 
+        var gearMaxSpeedMps: Double? = null
         if (rpm != null && rpm > 0) {
             val mph = speedMph(rpm, tireDiameter, totalRatio)
             val kmh = mph * KMH_PER_MPH
             textSpeedResult.text = String.format(Locale.US, "Speed: %.1f mph  /  %.1f km/h", mph, kmh)
+            gearMaxSpeedMps = mph / MPS_TO_MPH
         } else {
             textSpeedResult.text = "Speed: -- mph  /  -- km/h"
         }
@@ -182,14 +196,14 @@ class MainActivity : AppCompatActivity() {
         }
         textSpeedTable.text = sb.toString()
 
-        calculateSandDrag()
+        calculateSandDrag(gearMaxSpeedMps)
     }
 
     private fun speedMph(rpm: Double, tireDiameter: Double, totalRatio: Double): Double {
         return (rpm * tireDiameter) / (totalRatio * MPH_CONSTANT)
     }
 
-    private fun calculateSandDrag() {
+    private fun calculateSandDrag(gearMaxSpeedMps: Double?) {
         val weightKg = editWeight.valueOrNull()
         val horsepower = editHorsepower.valueOrNull()
 
@@ -198,31 +212,54 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val condition = SAND_CONDITIONS[spinnerSandCondition.selectedItemPosition.coerceIn(0, SAND_CONDITIONS.size - 1)]
-        val result = simulateSandDrag(weightKg, horsepower, condition)
-
-        if (result == null) {
-            textSandDragResult.text = "90m ET: not enough traction/power"
-            textSandDragSpeed.text = "Try a lower weight, more HP, or a firmer sand condition."
+        if (gearMaxSpeedMps == null) {
+            textSandDragResult.text = "90m ET: enter Engine RPM"
+            textSandDragSpeed.text = "RPM (your redline/shift point) combines with tire size, axle ratio, transfer case ratio, and gear ratio to work out how fast this gearing can actually turn -- fill it in above to get a time."
             cardSandDrag.visibility = View.VISIBLE
             return
         }
 
-        val (etSeconds, speedMps) = result
-        val speedMph = speedMps * MPS_TO_MPH
+        val condition = SAND_CONDITIONS[spinnerSandCondition.selectedItemPosition.coerceIn(0, SAND_CONDITIONS.size - 1)]
+        val result = simulateSandDrag(weightKg, horsepower, condition, gearMaxSpeedMps)
 
-        textSandDragResult.text = String.format(Locale.US, "90m ET: %.2f sec (%s)", etSeconds, condition.label)
-        textSandDragSpeed.text = String.format(Locale.US, "Estimated speed at 90m: %.1f mph", speedMph)
+        if (result == null) {
+            textSandDragResult.text = "90m ET: not enough traction/power"
+            textSandDragSpeed.text = "Try a lower weight, more HP, taller gearing/higher RPM, or a firmer sand condition."
+            cardSandDrag.visibility = View.VISIBLE
+            return
+        }
+
+        val speedMph = result.speedMps * MPS_TO_MPH
+
+        textSandDragResult.text = String.format(Locale.US, "90m ET: %.2f sec (%s)", result.etSeconds, condition.label)
+        textSandDragSpeed.text = if (result.gearLimited) {
+            String.format(
+                Locale.US,
+                "Estimated speed at 90m: %.1f mph -- gearing-limited (hit your RPM before 90m; shorten gearing, bigger tire, or more RPM to go faster)",
+                speedMph
+            )
+        } else {
+            String.format(Locale.US, "Estimated speed at 90m: %.1f mph (power/traction-limited, gearing has headroom)", speedMph)
+        }
         cardSandDrag.visibility = View.VISIBLE
     }
 
+    private data class SandDragResult(val etSeconds: Double, val speedMps: Double, val gearLimited: Boolean)
+
     /**
      * Steps Newton's second law forward at SIM_DT increments until the
-     * vehicle covers SAND_DRAG_METERS. Returns (elapsed seconds, speed m/s)
-     * at that point, or null if the vehicle can't out-accelerate rolling
-     * resistance (or doesn't reach 90m within SIM_MAX_TIME).
+     * vehicle covers SAND_DRAG_METERS. The vehicle accelerates under
+     * power/traction as usual, but its speed is capped at gearMaxSpeedMps --
+     * the top speed this specific tire/axle/transfer-case/gear/RPM combo can
+     * turn. Returns null if the vehicle can't out-accelerate resistance (or
+     * doesn't reach 90m within SIM_MAX_TIME).
      */
-    private fun simulateSandDrag(weightKg: Double, horsepower: Double, condition: SandCondition): Pair<Double, Double>? {
+    private fun simulateSandDrag(
+        weightKg: Double,
+        horsepower: Double,
+        condition: SandCondition,
+        gearMaxSpeedMps: Double
+    ): SandDragResult? {
         val powerWatts = horsepower * HP_TO_WATTS
         val resistForce = condition.crr * weightKg * GRAVITY
         val maxTractionForce = condition.muTraction * weightKg * GRAVITY
@@ -230,18 +267,26 @@ class MainActivity : AppCompatActivity() {
         var t = 0.0
         var v = 0.0
         var d = 0.0
+        var gearLimited = false
 
         while (t < SIM_MAX_TIME) {
-            val driveForce = if (v < 0.5) maxTractionForce else minOf(powerWatts / v, maxTractionForce)
-            val netForce = driveForce - resistForce
-            if (netForce <= 0.0) return null
+            if (v >= gearMaxSpeedMps) {
+                v = gearMaxSpeedMps
+                gearLimited = true
+            } else {
+                val driveForce = if (v < 0.5) maxTractionForce else minOf(powerWatts / v, maxTractionForce)
+                val netForce = driveForce - resistForce
+                if (netForce <= 0.0) return null
 
-            val acceleration = netForce / weightKg
-            v += acceleration * SIM_DT
+                val acceleration = netForce / weightKg
+                v += acceleration * SIM_DT
+                if (v > gearMaxSpeedMps) v = gearMaxSpeedMps
+            }
+
             d += v * SIM_DT
             t += SIM_DT
 
-            if (d >= SAND_DRAG_METERS) return Pair(t, v)
+            if (d >= SAND_DRAG_METERS) return SandDragResult(t, v, gearLimited)
         }
         return null
     }
