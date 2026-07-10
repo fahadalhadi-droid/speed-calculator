@@ -153,17 +153,17 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Estimate based on weight and horsepower (drag-racing ET formula scaled to 90m). Actual sand times vary a lot with traction, sand condition, and launch."
+            android:text="Physics-based estimate: simulates acceleration using weight, power, rolling resistance and available traction for the chosen sand condition. Still an estimate -- real times vary with tires, moisture, and launch technique."
             android:textSize="13sp"
             android:textColor="@color/text_dark"
             android:layout_marginBottom="20dp"/>
 
         <!-- Vehicle Weight -->
-        <TextView style="@style/FieldLabel" android:text="Vehicle Weight (lbs, with driver)"/>
+        <TextView style="@style/FieldLabel" android:text="Vehicle Weight (kg, with driver)"/>
         <EditText
             android:id="@+id/editWeight"
             style="@style/FieldInput"
-            android:hint="e.g. 4200"
+            android:hint="e.g. 1900"
             android:inputType="numberDecimal"/>
 
         <!-- Horsepower -->
@@ -173,6 +173,16 @@
             style="@style/FieldInput"
             android:hint="e.g. 300"
             android:inputType="numberDecimal"/>
+
+        <!-- Sand Condition -->
+        <TextView style="@style/FieldLabel" android:text="Sand Condition"/>
+        <Spinner
+            android:id="@+id/spinnerSandCondition"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:background="@android:drawable/btn_dropdown"
+            android:spinnerMode="dropdown"/>
 
         <androidx.cardview.widget.CardView
             android:id="@+id/cardSandDrag"
