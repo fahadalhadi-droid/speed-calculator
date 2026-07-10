@@ -43,6 +43,15 @@ import java.util.Locale
  * looser conditions -- they are estimates, not measured constants for any
  * specific vehicle/tire combination. Real ETs vary with tire choice
  * (paddle vs all-terrain), moisture, tire pressure, and launch technique.
+ *
+ * The "Race paddle tires (prepped track)" condition is calibrated (not
+ * estimated) from a real reference run: a 1000kg / 982hp purpose-built sand
+ * drag buggy on dedicated paddle tires covering 90m in 4.05s. Paddle tires
+ * dig into sand rather than rolling over it, so they reach effective traction
+ * levels close to a paved drag strip (mu approx. 1.17) -- far beyond what
+ * all-terrain or mud-terrain tires achieve on the same surface. Use this
+ * preset only for dedicated paddle-tire race vehicles, not stock-tired
+ * off-road rigs.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -80,7 +89,8 @@ class MainActivity : AppCompatActivity() {
             SandCondition("Hard-packed / wet sand", crr = 0.06, muTraction = 0.60),
             SandCondition("Medium / groomed sand", crr = 0.11, muTraction = 0.42),
             SandCondition("Soft sand", crr = 0.18, muTraction = 0.30),
-            SandCondition("Loose / deep sand", crr = 0.25, muTraction = 0.30)
+            SandCondition("Loose / deep sand", crr = 0.25, muTraction = 0.30),
+            SandCondition("Race paddle tires (prepped track)", crr = 0.05, muTraction = 1.17)
         )
     }
 
