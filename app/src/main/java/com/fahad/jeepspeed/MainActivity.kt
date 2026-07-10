@@ -3,7 +3,10 @@ package com.fahad.jeepspeed
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.View
+import android.widget.ArrayAdapter
 import android.widget.EditText
+import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import java.util.Locale
@@ -19,17 +22,27 @@ import java.util.Locale
  *
  * KM/H = MPH x 1.60934
  *
- * 90m Sand Drag ET estimate:
- * Uses the standard drag-racing quarter-mile ET/trap-speed formulas
- *   ET_quarter (sec)   = 5.825 x (Weight_lbs / HP)^(1/3)
- *   Speed_quarter (mph) = 234   x (HP / Weight_lbs)^(1/3)
- * then scales them to 90m using constant-power kinematics, where for a
- * fixed weight/power vehicle distance and time relate as d ~ t^(3/2):
- *   ET_90    = ET_quarter    x (90 / 402.336)^(2/3)
- *   Speed_90 = Speed_quarter x (90 / 402.336)^(1/3)
- * (402.336m = 1/4 mile). This is a physics-based estimate calibrated off
- * pavement drag-strip data -- real sand times depend heavily on traction,
- * sand condition, tire choice, and launch technique.
+ * 90m Sand Drag ET estimate (physics simulation):
+ * Rather than scaling a pavement drag-strip formula, this steps Newton's
+ * second law forward in small time increments:
+ *   F_drive  = min(Power / v, mu_traction * m * g)   -- traction-limited at
+ *              launch (low v), power-limited once P/v drops below the max
+ *              tractive force the sand can support
+ *   F_resist = Crr * m * g                            -- rolling resistance
+ *   a        = (F_drive - F_resist) / m
+ *   v(t+dt)  = v(t) + a*dt ;  d(t+dt) = d(t) + v*dt
+ * until d reaches 90m (or the vehicle can't out-accelerate resistance, in
+ * which case there's no result).
+ *
+ * Rolling resistance coefficients (Crr) for compacted sand are documented in
+ * terramechanics literature at roughly 0.10-0.155 (e.g. Coutermarsh,
+ * "Velocity effect of vehicle rolling resistance in sand", J. Terramechanics).
+ * Looser/softer sand increases both rolling resistance and wheel slip
+ * (reducing usable traction) well beyond that range; the values below extend
+ * that published range using standard off-road engineering assumptions for
+ * looser conditions -- they are estimates, not measured constants for any
+ * specific vehicle/tire combination. Real ETs vary with tire choice
+ * (paddle vs all-terrain), moisture, tire pressure, and launch technique.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -44,19 +57,31 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var editWeight: EditText
     private lateinit var editHorsepower: EditText
+    private lateinit var spinnerSandCondition: Spinner
     private lateinit var cardSandDrag: androidx.cardview.widget.CardView
     private lateinit var textSandDragResult: TextView
     private lateinit var textSandDragSpeed: TextView
+
+    private data class SandCondition(val label: String, val crr: Double, val muTraction: Double)
 
     companion object {
         private const val MPH_CONSTANT = 336.0
         private const val KMH_PER_MPH = 1.60934
         private val TABLE_RPMS = listOf(1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000)
 
-        private const val QUARTER_MILE_METERS = 402.336
+        private const val GRAVITY = 9.81
+        private const val HP_TO_WATTS = 745.7
+        private const val MPS_TO_MPH = 2.23694
         private const val SAND_DRAG_METERS = 90.0
-        private const val ET_CONSTANT = 5.825
-        private const val TRAP_SPEED_CONSTANT = 234.0
+        private const val SIM_DT = 0.02
+        private const val SIM_MAX_TIME = 60.0
+
+        private val SAND_CONDITIONS = listOf(
+            SandCondition("Hard-packed / wet sand", crr = 0.06, muTraction = 0.60),
+            SandCondition("Medium / groomed sand", crr = 0.11, muTraction = 0.42),
+            SandCondition("Soft sand", crr = 0.18, muTraction = 0.30),
+            SandCondition("Loose / deep sand", crr = 0.25, muTraction = 0.30)
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,9 +99,16 @@ class MainActivity : AppCompatActivity() {
 
         editWeight = findViewById(R.id.editWeight)
         editHorsepower = findViewById(R.id.editHorsepower)
+        spinnerSandCondition = findViewById(R.id.spinnerSandCondition)
         cardSandDrag = findViewById(R.id.cardSandDrag)
         textSandDragResult = findViewById(R.id.textSandDragResult)
         textSandDragSpeed = findViewById(R.id.textSandDragSpeed)
+
+        spinnerSandCondition.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            SAND_CONDITIONS.map { it.label }
+        )
 
         findViewById<android.widget.Button>(R.id.buttonCalculate).setOnClickListener {
             calculate()
@@ -91,6 +123,13 @@ class MainActivity : AppCompatActivity() {
             editTireDiameter, editAxleRatio, editTransferCase, editGearRatio, editRpm,
             editWeight, editHorsepower
         ).forEach { it.addTextChangedListener(watcher) }
+
+        spinnerSandCondition.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                calculate()
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
+        }
     }
 
     private fun EditText.valueOrNull(): Double? = text.toString().trim().toDoubleOrNull()
@@ -141,23 +180,59 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun calculateSandDrag() {
-        val weight = editWeight.valueOrNull()
+        val weightKg = editWeight.valueOrNull()
         val horsepower = editHorsepower.valueOrNull()
 
-        if (weight == null || weight <= 0 || horsepower == null || horsepower <= 0) {
-            cardSandDrag.visibility = android.view.View.GONE
+        if (weightKg == null || weightKg <= 0 || horsepower == null || horsepower <= 0) {
+            cardSandDrag.visibility = View.GONE
             return
         }
 
-        val distanceScale = SAND_DRAG_METERS / QUARTER_MILE_METERS
-        val etQuarterMile = ET_CONSTANT * Math.cbrt(weight / horsepower)
-        val trapSpeedQuarterMile = TRAP_SPEED_CONSTANT * Math.cbrt(horsepower / weight)
+        val condition = SAND_CONDITIONS[spinnerSandCondition.selectedItemPosition.coerceIn(0, SAND_CONDITIONS.size - 1)]
+        val result = simulateSandDrag(weightKg, horsepower, condition)
 
-        val et90m = etQuarterMile * Math.pow(distanceScale, 2.0 / 3.0)
-        val speed90m = trapSpeedQuarterMile * Math.pow(distanceScale, 1.0 / 3.0)
+        if (result == null) {
+            textSandDragResult.text = "90m ET: not enough traction/power"
+            textSandDragSpeed.text = "Try a lower weight, more HP, or a firmer sand condition."
+            cardSandDrag.visibility = View.VISIBLE
+            return
+        }
 
-        textSandDragResult.text = String.format(Locale.US, "90m ET: %.2f sec", et90m)
-        textSandDragSpeed.text = String.format(Locale.US, "Estimated speed at 90m: %.1f mph", speed90m)
-        cardSandDrag.visibility = android.view.View.VISIBLE
+        val (etSeconds, speedMps) = result
+        val speedMph = speedMps * MPS_TO_MPH
+
+        textSandDragResult.text = String.format(Locale.US, "90m ET: %.2f sec (%s)", etSeconds, condition.label)
+        textSandDragSpeed.text = String.format(Locale.US, "Estimated speed at 90m: %.1f mph", speedMph)
+        cardSandDrag.visibility = View.VISIBLE
+    }
+
+    /**
+     * Steps Newton's second law forward at SIM_DT increments until the
+     * vehicle covers SAND_DRAG_METERS. Returns (elapsed seconds, speed m/s)
+     * at that point, or null if the vehicle can't out-accelerate rolling
+     * resistance (or doesn't reach 90m within SIM_MAX_TIME).
+     */
+    private fun simulateSandDrag(weightKg: Double, horsepower: Double, condition: SandCondition): Pair<Double, Double>? {
+        val powerWatts = horsepower * HP_TO_WATTS
+        val resistForce = condition.crr * weightKg * GRAVITY
+        val maxTractionForce = condition.muTraction * weightKg * GRAVITY
+
+        var t = 0.0
+        var v = 0.0
+        var d = 0.0
+
+        while (t < SIM_MAX_TIME) {
+            val driveForce = if (v < 0.5) maxTractionForce else minOf(powerWatts / v, maxTractionForce)
+            val netForce = driveForce - resistForce
+            if (netForce <= 0.0) return null
+
+            val acceleration = netForce / weightKg
+            v += acceleration * SIM_DT
+            d += v * SIM_DT
+            t += SIM_DT
+
+            if (d >= SAND_DRAG_METERS) return Pair(t, v)
+        }
+        return null
     }
 }
