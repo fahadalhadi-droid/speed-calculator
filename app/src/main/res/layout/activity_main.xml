@@ -140,5 +140,74 @@
             android:textColor="@color/text_dark"
             android:text=""/>
 
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="90m Sand Drag Time"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@color/jeep_green_dark"
+            android:layout_marginBottom="4dp"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Estimate based on weight and horsepower (drag-racing ET formula scaled to 90m). Actual sand times vary a lot with traction, sand condition, and launch."
+            android:textSize="13sp"
+            android:textColor="@color/text_dark"
+            android:layout_marginBottom="20dp"/>
+
+        <!-- Vehicle Weight -->
+        <TextView style="@style/FieldLabel" android:text="Vehicle Weight (lbs, with driver)"/>
+        <EditText
+            android:id="@+id/editWeight"
+            style="@style/FieldInput"
+            android:hint="e.g. 4200"
+            android:inputType="numberDecimal"/>
+
+        <!-- Horsepower -->
+        <TextView style="@style/FieldLabel" android:text="Engine Horsepower (at the wheels if known)"/>
+        <EditText
+            android:id="@+id/editHorsepower"
+            style="@style/FieldInput"
+            android:hint="e.g. 300"
+            android:inputType="numberDecimal"/>
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/cardSandDrag"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:visibility="gone"
+            app:cardCornerRadius="12dp"
+            app:cardBackgroundColor="@color/accent_orange">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="18dp">
+
+                <TextView
+                    android:id="@+id/textSandDragResult"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="90m ET: -- sec"
+                    android:textColor="@color/white"
+                    android:textStyle="bold"
+                    android:textSize="20sp"/>
+
+                <TextView
+                    android:id="@+id/textSandDragSpeed"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="Estimated speed at 90m: -- mph"
+                    android:textColor="@color/white"
+                    android:textSize="14sp"/>
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
     </LinearLayout>
 </ScrollView>
